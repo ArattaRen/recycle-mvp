@@ -1,0 +1,38 @@
+name: Refresh radar points
+
+on:
+  schedule:
+    # 06:00 и 18:00 UTC = 09:00 и 21:00 по Москве
+    - cron: "0 6,18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Забрать репозиторий
+        uses: actions/checkout@v4
+
+      - name: Установить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Установить зависимости
+        run: pip install requests
+
+      - name: Запустить парсер (Overpass API)
+        run: python osint_parser.py
+
+      - name: Выгрузить точки в points.json
+        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, sku_code AS sku, price, status FROM points" > points.json
+
+      - name: Опубликовать обновление
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add points.json
+          git diff --cached --quiet || (git commit -m "auto: refresh points" && git push)
