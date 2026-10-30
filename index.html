@@ -22,8 +22,8 @@
             attribution: 'Esri'
         }).addTo(map);
 
-        // Запрос к нашему Backend API
-        fetch('/api/points')
+        // Запрос к данным (файл points.json лежит рядом с картой)
+        fetch('points.json')
             .then(response => response.json())
             .then(data => {
                 data.forEach(p => {

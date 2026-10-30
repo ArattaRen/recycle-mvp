@@ -2,9 +2,12 @@ import requests
 import sqlite3
 import random
 import time
+import json
+import os
 from datetime import date, timedelta
 
 DB_NAME = "recycle_local.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Overpass отклоняет запросы без осмысленного User-Agent (HTTP 406/429),
 # поэтому обходим несколько зеркал по очереди

@@ -1,0 +1,130 @@
+[
+  {
+    "name": "контейнер",
+    "lat": 50.574071,
+    "lon": 36.5634597,
+    "sku": "PET-MIX",
+    "price": 29.53,
+    "status": "GREEN"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 1617723193)",
+    "lat": 50.5931204,
+    "lon": 36.5732078,
+    "sku": "PET-MIX",
+    "price": 38.01,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2461431579)",
+    "lat": 50.576686,
+    "lon": 36.5857482,
+    "sku": "PET-MIX",
+    "price": 52.26,
+    "status": "GREEN"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2461431586)",
+    "lat": 50.5743049,
+    "lon": 36.5845651,
+    "sku": "PET-MIX",
+    "price": 51.72,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2461431596)",
+    "lat": 50.5742076,
+    "lon": 36.5877973,
+    "sku": "PET-MIX",
+    "price": 37.52,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2461431598)",
+    "lat": 50.577371,
+    "lon": 36.5879205,
+    "sku": "PET-MIX",
+    "price": 32.18,
+    "status": "YELLOW"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2461436819)",
+    "lat": 50.5773982,
+    "lon": 36.59336,
+    "sku": "PET-MIX",
+    "price": 39.61,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2495759727)",
+    "lat": 50.5732275,
+    "lon": 36.588857,
+    "sku": "PET-MIX",
+    "price": 44.75,
+    "status": "YELLOW"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2495759780)",
+    "lat": 50.5754464,
+    "lon": 36.5906914,
+    "sku": "PET-MIX",
+    "price": 28.66,
+    "status": "YELLOW"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2495759794)",
+    "lat": 50.5768665,
+    "lon": 36.5902975,
+    "sku": "PET-MIX",
+    "price": 54.76,
+    "status": "YELLOW"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2495759796)",
+    "lat": 50.5769164,
+    "lon": 36.5913134,
+    "sku": "PET-MIX",
+    "price": 31.89,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2495759799)",
+    "lat": 50.5770459,
+    "lon": 36.5918458,
+    "sku": "PET-MIX",
+    "price": 53.51,
+    "status": "GREEN"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 2504261219)",
+    "lat": 50.5742347,
+    "lon": 36.5869818,
+    "sku": "PET-MIX",
+    "price": 25.42,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 3656995852)",
+    "lat": 50.5705163,
+    "lon": 36.5891693,
+    "sku": "PET-MIX",
+    "price": 32.33,
+    "status": "YELLOW"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 9995019315)",
+    "lat": 50.5743397,
+    "lon": 36.5877999,
+    "sku": "PET-MIX",
+    "price": 44.76,
+    "status": "GREY"
+  },
+  {
+    "name": "Пункт приема (OSM ID: 358062202)",
+    "lat": 50.7837056,
+    "lon": 37.0477619,
+    "sku": "PET-MIX",
+    "price": 30.48,
+    "status": "GREY"
+  }
+]
