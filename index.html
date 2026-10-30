@@ -3,9 +3,12 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Recycle Radar (TMA Mock)</title>
+    <title>Recycle Radar — Краснодарский край</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; }
         .leaflet-popup-content { font-size: 14px; }
@@ -14,8 +17,8 @@
 <body>
     <div id="map"></div>
     <script>
-        // Инициализация карты (Центр на Белгород)
-        var map = L.map('map').setView([50.595, 36.587], 11);
+        // Инициализация карты (центр — Краснодарский край)
+        var map = L.map('map').setView([45.04, 38.98], 7);
         
         // Подложка Esri (работает без API-ключа)
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -26,17 +29,20 @@
         fetch('points.json')
             .then(response => response.json())
             .then(data => {
+                var markers = L.markerClusterGroup();
                 data.forEach(p => {
                     var color = p.status === 'GREEN' ? '#28a745' : (p.status === 'YELLOW' ? '#ffc107' : '#6c757d');
-                    L.circleMarker([p.lat, p.lon], {
+                    var m = L.circleMarker([p.lat, p.lon], {
                         radius: 10,
                         fillColor: color,
                         color: '#fff',
                         weight: 2,
                         opacity: 1,
                         fillOpacity: 0.8
-                    }).addTo(map).bindPopup(`<b>${p.name}</b><br>SKU: ${p.sku}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}`);
+                    }).bindPopup(`<b>${p.name}</b><br>SKU: ${p.sku}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}`);
+                    markers.addLayer(m);
                 });
+                map.addLayer(markers);
             })
             .catch(err => console.error("Ошибка API:", err));
     </script>

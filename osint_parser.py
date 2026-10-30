@@ -24,11 +24,13 @@ HEADERS = {
 
 def fetch_and_save():
     print("Подключение к OpenStreetMap (Overpass API)...")
+    # Краснодарский край целиком: bbox (юг, запад, север, восток).
+    # Bbox-запрос быстрее и надёжнее поиска area по имени региона
     query = """
-    [out:json][timeout:25];
+    [out:json][timeout:90];
     (
-      node["amenity"="recycling"](around:50000,50.595,36.587);
-      way["amenity"="recycling"](around:50000,50.595,36.587);
+      node["amenity"="recycling"](43.3,36.6,46.9,41.6);
+      way["amenity"="recycling"](43.3,36.6,46.9,41.6);
     );
     out center;
     """
