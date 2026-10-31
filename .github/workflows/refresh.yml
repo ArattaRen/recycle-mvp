@@ -28,7 +28,7 @@ jobs:
         run: python osint_parser.py
 
       - name: Выгрузить точки в points.json
-        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, sku_code AS sku, price, status FROM points" > points.json
+        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, sku_code AS sku, price, status, accepted, phone FROM points" > points.json
 
       - name: Опубликовать обновление
         run: |
