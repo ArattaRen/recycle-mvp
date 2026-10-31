@@ -24,11 +24,19 @@ jobs:
       - name: Установить зависимости
         run: pip install requests
 
-      - name: Запустить парсер (Overpass API)
-        run: python osint_parser.py
+      - name: Запустить парсер (Overpass API, до 3 попыток)
+        run: |
+          ok=0
+          for i in 1 2 3; do
+            python osint_parser.py
+            if [ -f recycle_local.db ] && [ "$(sqlite3 recycle_local.db 'SELECT COUNT(*) FROM points')" -gt 0 ]; then ok=1; break; fi
+            echo "Попытка $i не удалась, пауза 60 секунд"
+            sleep 60
+          done
+          if [ "$ok" != "1" ]; then echo "Все попытки провалились"; exit 1; fi
 
       - name: Выгрузить точки в points.json
-        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, sku_code AS sku, price, status, accepted, (phone IS NOT NULL AND phone != '') AS has_phone, city FROM points" > points.json
+        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, sku_code AS sku, price, status, accepted, (phone IS NOT NULL AND phone != '') AS has_phone, city, sku_codes, opening_hours, website FROM points" > points.json
 
       - name: Опубликовать обновление
         run: |
