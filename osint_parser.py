@@ -134,6 +134,72 @@ def extract_phone(tags):
     return tags.get("phone") or tags.get("contact:phone") or tags.get("contact:mobile")
 
 
+# S-1: словарь «тег OSM -> SKU-код» (формат ГРУППА-ФОРМА-СОСТОЯНИЕ-СОРТ).
+# Полный каталог с русскими названиями и сленгом — sku_catalog.json (внутренний актив)
+TAG_TO_SKU = {
+    "recycling:PET": "PET-BOT-MIXS",
+    "recycling:pet": "PET-BOT-MIXS",
+    "recycling:plastic_bottles": "PET-BOT-MIXS",
+    "recycling:plastic": "PLA-MIX-MIXD",
+    "recycling:plastic_packaging": "PLA-BOX-MIXD",
+    "recycling:plastic_bags": "PLA-FLM-MIXD",
+    "recycling:scrap_metal": "MET-SCR-MIXD",
+    "recycling:metal": "MET-SCR-MIXD",
+    "recycling:aluminium": "MET-ALU-MIXD",
+    "recycling:cans": "MET-CAN-MIXD",
+    "recycling:steel": "MET-CAN-MIXD",
+    "recycling:paper": "PAP-MIX-MIXD",
+    "recycling:newspaper": "PAP-MIX-MIXD",
+    "recycling:magazines": "PAP-MIX-MIXD",
+    "recycling:books": "PAP-MIX-MIXD",
+    "recycling:cardboard": "PAP-BOX-MIXD",
+    "recycling:cartons": "PAP-BOX-MIXD",
+    "recycling:paper_packaging": "PAP-BOX-MIXD",
+    "recycling:glass_bottles": "GLS-BOT-MIXD",
+    "recycling:glass": "GLS-MIX-MIXD",
+    "recycling:glass_jars": "GLS-MIX-MIXD",
+    "recycling:clothes": "TEX-MIX-MIXD",
+    "recycling:shoes": "TEX-MIX-MIXD",
+    "recycling:batteries": "BAT-MIX-MIXD",
+    "recycling:e_waste": "ELS-MIX-MIXD",
+    "recycling:small_appliances": "ELS-MIX-MIXD",
+    "recycling:white_goods": "ELS-MIX-MIXD",
+    "recycling:electrical_items": "ELS-MIX-MIXD",
+    "recycling:green_waste": "ORG-MIX-MIXD",
+    "recycling:food_waste": "ORG-MIX-MIXD",
+    "recycling:wood": "WOD-MIX-MIXD",
+    "recycling:oil": "OIL-MIX-MIXD",
+    "recycling:engine_oil": "OIL-MIX-MIXD",
+    "recycling:cooking_oil": "OIL-MIX-MIXD",
+    "recycling:hazardous_waste": "HAZ-MIX-MIXD",
+    "recycling:low_energy_bulbs": "LMP-MIX-MIXD",
+    "recycling:light_bulbs": "LMP-MIX-MIXD",
+    "recycling:fluorescent_tubes": "LMP-MIX-MIXD",
+    "recycling:beverage_cartons": "TET-MIX-MIXD",
+    "recycling:tyres": "TYR-MIX-MIXD",
+}
+
+
+def extract_sku_codes(tags):
+    codes = []
+    for key, value in tags.items():
+        if not key.startswith("recycling:") or str(value).lower() not in ("yes", "only"):
+            continue
+        code = TAG_TO_SKU.get(key)
+        if code and code not in codes:
+            codes.append(code)
+    return ", ".join(codes) if codes else None
+
+
+def extract_extras(tags):
+    # Публичные данные организаций из OSM: часы работы и сайт
+    opening = tags.get("opening_hours")
+    website = tags.get("website") or tags.get("contact:website")
+    if website and not website.startswith(("http://", "https://")):
+        website = None
+    return opening, website
+
+
 # Города полигона для фильтра «город» на карте: точка относится к ближайшему
 # центру в радиусе CITY_RADIUS_KM (формула гаверсинуса), иначе — запасная метка
 CITIES = [
@@ -161,13 +227,24 @@ CITIES = [
     ("Апшеронск", 44.467, 39.737),
     ("Кореновск", 45.468, 39.452),
 ]
+
+# S-2: регионы полигона. Новый регион = новая запись (bbox строкой + список
+# городов) и смена ACTIVE_REGION — больше ничего править не нужно
+REGIONS = {
+    "Краснодарский край": {
+        "bbox_str": "43.3,36.6,46.9,41.6",
+        "cities": CITIES,
+    },
+}
+ACTIVE_REGION = "Краснодарский край"
 CITY_RADIUS_KM = 30
 CITY_FALLBACK = "Пригороды и районы"
 
 
 def detect_city(lat, lon):
+    cities = REGIONS[ACTIVE_REGION]["cities"]
     best, best_d = CITY_FALLBACK, CITY_RADIUS_KM
-    for name, clat, clon in CITIES:
+    for name, clat, clon in cities:
         dlat = math.radians(clat - lat)
         dlon = math.radians(clon - lon)
         a = (math.sin(dlat / 2) ** 2 +
@@ -179,16 +256,16 @@ def detect_city(lat, lon):
 
 def fetch_and_save():
     print("Подключение к OpenStreetMap (Overpass API)...")
-    # Краснодарский край целиком: bbox (юг, запад, север, восток).
-    # Bbox-запрос быстрее и надёжнее поиска area по имени региона
+    # Активный регион из REGIONS; один шаблон запроса, bbox подставляется
+    # строковой заменой (без f-string)
     query = """
     [out:json][timeout:90];
     (
-      node["amenity"="recycling"](43.3,36.6,46.9,41.6);
-      way["amenity"="recycling"](43.3,36.6,46.9,41.6);
+      node["amenity"="recycling"](__BBOX__);
+      way["amenity"="recycling"](__BBOX__);
     );
     out center;
-    """
+    """.replace("__BBOX__", REGIONS[ACTIVE_REGION]["bbox_str"])
     
     data = None
     session = requests.Session()
@@ -219,7 +296,8 @@ def fetch_and_save():
     c.execute("""CREATE TABLE IF NOT EXISTS points (
         id INTEGER PRIMARY KEY, name TEXT, lat REAL, lon REAL,
         sku_code TEXT, price REAL, last_updated TEXT, status TEXT,
-        accepted TEXT, phone TEXT, city TEXT, osm_id TEXT)""")
+        accepted TEXT, phone TEXT, city TEXT, osm_id TEXT,
+        sku_codes TEXT, opening_hours TEXT, website TEXT)""")
     try:
         c.execute("ALTER TABLE points ADD COLUMN accepted TEXT")
     except sqlite3.OperationalError:
@@ -234,6 +312,18 @@ def fetch_and_save():
         pass
     try:
         c.execute("ALTER TABLE points ADD COLUMN osm_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN sku_codes TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN opening_hours TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN website TEXT")
     except sqlite3.OperationalError:
         pass
     c.execute("DELETE FROM points")
@@ -255,13 +345,15 @@ def fetch_and_save():
             continue
         accepted = extract_accepted(tags)
         phone = extract_phone(tags)
+        sku_codes = extract_sku_codes(tags)
+        opening_hours, website = extract_extras(tags)
         price = round(random.uniform(25.0, 55.0), 2)
         days_ago = random.randint(0, 10)
         status = "GREEN" if days_ago <= 3 else ("YELLOW" if days_ago <= 7 else "GREY")
         last_updated = (date.today() - timedelta(days=days_ago)).isoformat()
         
-        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone, city, osm_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone, detect_city(lat, lon), osm_key))
+        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone, city, osm_id, sku_codes, opening_hours, website) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone, detect_city(lat, lon), osm_key, sku_codes, opening_hours, website))
         count += 1
         
     conn.commit()
