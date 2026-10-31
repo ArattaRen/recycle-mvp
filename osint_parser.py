@@ -5,6 +5,9 @@ import time
 import json
 import os
 import math
+import socket
+import ipaddress
+from urllib.parse import urlparse
 from datetime import date, timedelta
 
 DB_NAME = "recycle_local.db"
@@ -22,6 +25,25 @@ HEADERS = {
     "User-Agent": "RecycleRadar/0.1 (OSINT MVP; Belgorod recycling points)",
     "Accept": "application/json",
 }
+
+# Защита от SSRF: парсер ходит только на https-зеркала из белого списка, хост
+# резолвится и все его IP обязаны быть публичными (не localhost/частные/локальные)
+ALLOWED_OVERPASS_HOSTS = {"overpass-api.de", "overpass.kumi.systems", "maps.mail.ru"}
+
+
+def validate_overpass_url(url):
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in ALLOWED_OVERPASS_HOSTS:
+        return False
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, 443)
+    except socket.gaierror:
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            return False
+    return True
 
 # Т1: мягкий фильтр — убираем объекты, которые точно не являются пунктами
 # приёма вторсырья, но попали в OSM с тегом amenity=recycling
@@ -150,9 +172,14 @@ def fetch_and_save():
     """
     
     data = None
+    session = requests.Session()
     for endpoint in OVERPASS_ENDPOINTS:
+        if not validate_overpass_url(endpoint):
+            print(f"{endpoint}: адрес не прошёл проверку белого списка, пропуск")
+            continue
         try:
-            response = requests.get(endpoint, params={'data': query}, headers=HEADERS, timeout=45)
+            response = session.get(endpoint, params={'data': query}, headers=HEADERS,
+                                   timeout=45, allow_redirects=False)
             if response.status_code != 200:
                 print(f"{endpoint}: HTTP {response.status_code}, пробую следующее зеркало")
                 time.sleep(2)
