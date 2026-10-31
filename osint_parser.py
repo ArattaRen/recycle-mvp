@@ -45,6 +45,25 @@ def validate_overpass_url(url):
             return False
     return True
 
+
+# Скрытые точки: идентификаторы из hidden_points.txt не попадают на карту
+# (юритребование оферты «Скрыть мою точку»). Формат файла: по одному в строке
+# "node/<id>" или "way/<id>", строки с # — комментарии. Пустой файл/отсутствие = нечего скрывать.
+HIDDEN_FILE = "hidden_points.txt"
+
+
+def load_hidden_ids():
+    path = os.path.join(BASE_DIR, HIDDEN_FILE)
+    hidden = set()
+    if not os.path.exists(path):
+        return hidden
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            key = line.strip().lower()
+            if key and not key.startswith("#"):
+                hidden.add(key)
+    return hidden
+
 # Т1: мягкий фильтр — убираем объекты, которые точно не являются пунктами
 # приёма вторсырья, но попали в OSM с тегом amenity=recycling
 JUNK_NAME_PARTS = [
@@ -200,7 +219,7 @@ def fetch_and_save():
     c.execute("""CREATE TABLE IF NOT EXISTS points (
         id INTEGER PRIMARY KEY, name TEXT, lat REAL, lon REAL,
         sku_code TEXT, price REAL, last_updated TEXT, status TEXT,
-        accepted TEXT, phone TEXT, city TEXT)""")
+        accepted TEXT, phone TEXT, city TEXT, osm_id TEXT)""")
     try:
         c.execute("ALTER TABLE points ADD COLUMN accepted TEXT")
     except sqlite3.OperationalError:
@@ -213,10 +232,18 @@ def fetch_and_save():
         c.execute("ALTER TABLE points ADD COLUMN city TEXT")
     except sqlite3.OperationalError:
         pass
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN osm_id TEXT")
+    except sqlite3.OperationalError:
+        pass
     c.execute("DELETE FROM points")
     
+    hidden = load_hidden_ids()
     count = 0
     for el in data.get('elements', []):
+        osm_key = f"{el.get('type', 'node')}/{el['id']}".lower()
+        if osm_key in hidden:
+            continue
         lat = el.get('lat') or el.get('center', {}).get('lat')
         lon = el.get('lon') or el.get('center', {}).get('lon')
         if lat is None or lon is None:
@@ -233,8 +260,8 @@ def fetch_and_save():
         status = "GREEN" if days_ago <= 3 else ("YELLOW" if days_ago <= 7 else "GREY")
         last_updated = (date.today() - timedelta(days=days_ago)).isoformat()
         
-        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone, city) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone, detect_city(lat, lon)))
+        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone, city, osm_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone, detect_city(lat, lon), osm_key))
         count += 1
         
     conn.commit()

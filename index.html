@@ -28,6 +28,11 @@
         #toggle { font-size: 13px; padding: 6px 10px; border: 1px solid #bbb; border-radius: 6px;
                   background: #fff; cursor: pointer; }
         #count { font-size: 12px; color: #555; margin-top: 6px; }
+        #legend { font-size: 11px; color: #555; margin-top: 4px; }
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 2px; vertical-align: middle; }
+        .dot.green { background: #28a745; }
+        .dot.yellow { background: #ffc107; }
+        .dot.grey { background: #6c757d; }
         .hidden { display: none; }
         @media (max-width: 640px) {
             #panel { width: 94%; }
@@ -50,6 +55,7 @@
             <div id="chips"></div>
         </div>
         <div id="count">Загрузка данных…</div>
+        <div id="legend"><span class="dot green"></span>свежая &nbsp; <span class="dot yellow"></span>устаревает &nbsp; <span class="dot grey"></span>давно не подтверждена</div>
     </div>
 
     <script>
