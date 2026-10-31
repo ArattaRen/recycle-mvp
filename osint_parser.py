@@ -4,6 +4,7 @@ import random
 import time
 import json
 import os
+import math
 from datetime import date, timedelta
 
 DB_NAME = "recycle_local.db"
@@ -47,6 +48,31 @@ ACCEPTED_MAP = {
     "recycling:batteries": "батарейки",
     "recycling:e_waste": "электроника",
     "recycling:green_waste": "органика",
+    # часто встречающиеся теги OSM — чтобы чипы не сыпались английскими
+    "recycling:plastic_packaging": "пластиковая упаковка",
+    "recycling:plastic_bags": "пластиковые пакеты",
+    "recycling:PET": "ПЭТ",
+    "recycling:hazardous_waste": "опасные отходы",
+    "recycling:low_energy_bulbs": "энергосберегающие лампы",
+    "recycling:light_bulbs": "лампы",
+    "recycling:books": "книги",
+    "recycling:magazines": "журналы",
+    "recycling:cartons": "картонная упаковка",
+    "recycling:newspaper": "газеты",
+    "recycling:paper_packaging": "бумажная упаковка",
+    "recycling:beverage_cartons": "тетрапак",
+    "recycling:glass_jars": "стеклянные банки",
+    "recycling:tyres": "шины",
+    "recycling:shoes": "обувь",
+    "recycling:oil": "масла",
+    "recycling:engine_oil": "моторное масло",
+    "recycling:cooking_oil": "растительное масло",
+    "recycling:small_appliances": "мелкая электроника",
+    "recycling:white_goods": "крупная бытовая техника",
+    "recycling:fluorescent_tubes": "люминесцентные лампы",
+    "recycling:printer_cartridges": "картриджи",
+    "recycling:food_waste": "пищевые отходы",
+    "recycling:wood": "дерево",
 }
 
 
@@ -65,6 +91,50 @@ def extract_accepted(tags):
 
 def extract_phone(tags):
     return tags.get("phone") or tags.get("contact:phone") or tags.get("contact:mobile")
+
+
+# Города полигона для фильтра «город» на карте: точка относится к ближайшему
+# центру в радиусе CITY_RADIUS_KM (формула гаверсинуса), иначе — запасная метка
+CITIES = [
+    ("Краснодар", 45.035, 38.975),
+    ("Сочи", 43.586, 39.723),
+    ("Новороссийск", 44.724, 37.768),
+    ("Армавир", 44.989, 41.123),
+    ("Майкоп", 44.610, 40.106),
+    ("Ейск", 46.710, 38.276),
+    ("Кропоткин", 45.433, 40.575),
+    ("Славянск-на-Кубани", 45.259, 38.128),
+    ("Туапсе", 44.102, 39.076),
+    ("Анапа", 44.890, 37.317),
+    ("Геленджик", 44.562, 38.085),
+    ("Тихорецк", 45.854, 40.128),
+    ("Тимашевск", 45.617, 38.938),
+    ("Белореченск", 44.764, 39.866),
+    ("Приморско-Ахтарск", 46.049, 38.168),
+    ("Лабинск", 44.632, 40.731),
+    ("Абинск", 44.869, 38.156),
+    ("Усть-Лабинск", 45.216, 39.684),
+    ("Крымск", 44.931, 37.990),
+    ("Темрюк", 45.272, 37.380),
+    ("Горячий Ключ", 44.630, 39.134),
+    ("Апшеронск", 44.467, 39.737),
+    ("Кореновск", 45.468, 39.452),
+]
+CITY_RADIUS_KM = 30
+CITY_FALLBACK = "Пригороды и районы"
+
+
+def detect_city(lat, lon):
+    best, best_d = CITY_FALLBACK, CITY_RADIUS_KM
+    for name, clat, clon in CITIES:
+        dlat = math.radians(clat - lat)
+        dlon = math.radians(clon - lon)
+        a = (math.sin(dlat / 2) ** 2 +
+             math.cos(math.radians(lat)) * math.cos(math.radians(clat)) * math.sin(dlon / 2) ** 2)
+        d = 12742 * math.asin(math.sqrt(a))
+        if d < best_d:
+            best, best_d = name, d
+    return best
 
 def fetch_and_save():
     print("Подключение к OpenStreetMap (Overpass API)...")
@@ -103,13 +173,17 @@ def fetch_and_save():
     c.execute("""CREATE TABLE IF NOT EXISTS points (
         id INTEGER PRIMARY KEY, name TEXT, lat REAL, lon REAL,
         sku_code TEXT, price REAL, last_updated TEXT, status TEXT,
-        accepted TEXT, phone TEXT)""")
+        accepted TEXT, phone TEXT, city TEXT)""")
     try:
         c.execute("ALTER TABLE points ADD COLUMN accepted TEXT")
     except sqlite3.OperationalError:
         pass
     try:
         c.execute("ALTER TABLE points ADD COLUMN phone TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN city TEXT")
     except sqlite3.OperationalError:
         pass
     c.execute("DELETE FROM points")
@@ -132,8 +206,8 @@ def fetch_and_save():
         status = "GREEN" if days_ago <= 3 else ("YELLOW" if days_ago <= 7 else "GREY")
         last_updated = (date.today() - timedelta(days=days_ago)).isoformat()
         
-        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone))
+        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone, city) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone, detect_city(lat, lon)))
         count += 1
         
     conn.commit()

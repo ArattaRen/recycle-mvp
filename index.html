@@ -19,6 +19,8 @@
                  background: rgba(255,255,255,0.95); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
                  padding: 8px 10px; max-width: 94%; box-sizing: border-box; }
         #search { width: 240px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        #city { padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+                margin-top: 6px; width: 100%; box-sizing: border-box; background: #fff; }
         #chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 72vw; }
         .chip { font-size: 12px; padding: 4px 8px; border: 1px solid #bbb; border-radius: 14px;
                 background: #fff; cursor: pointer; user-select: none; }
@@ -44,6 +46,7 @@
         <button id="toggle">Фильтры и поиск ▾</button>
         <div id="controls" class="hidden">
             <input id="search" type="text" placeholder="Поиск по названию точки…">
+            <select id="city"><option value="">Все города</option></select>
             <div id="chips"></div>
         </div>
         <div id="count">Загрузка данных…</div>
@@ -74,13 +77,15 @@
 
         function applyFilters() {
             var q = document.getElementById('search').value.trim().toLowerCase();
+            var citySel = document.getElementById('city').value;
             markers.clearLayers();
             var shown = 0;
             allPoints.forEach(function(p) {
                 var okType = activeTypes.size === 0 ||
                     (p.accepted && p.accepted.split(', ').some(function(t) { return activeTypes.has(t); }));
                 var okName = !q || (p.name || '').toLowerCase().indexOf(q) !== -1;
-                if (okType && okName) {
+                var okCity = !citySel || (p.city || 'Пригороды и районы') === citySel;
+                if (okType && okName && okCity) {
                     var color = p.status === 'GREEN' ? '#28a745' : (p.status === 'YELLOW' ? '#ffc107' : '#6c757d');
                     var m = L.circleMarker([p.lat, p.lon], {
                         radius: 10, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8
@@ -97,6 +102,19 @@
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 allPoints = data || [];
+                var cityCounts = {};
+                allPoints.forEach(function(p) {
+                    var city = p.city || 'Пригороды и районы';
+                    cityCounts[city] = (cityCounts[city] || 0) + 1;
+                });
+                var citySel = document.getElementById('city');
+                Object.keys(cityCounts).sort(function(a, b) { return cityCounts[b] - cityCounts[a]; }).forEach(function(cn) {
+                    var opt = document.createElement('option');
+                    opt.value = cn;
+                    opt.textContent = cn + ' (' + cityCounts[cn] + ')';
+                    citySel.appendChild(opt);
+                });
+                citySel.addEventListener('change', applyFilters);
                 var typeCounts = {};
                 allPoints.forEach(function(p) {
                     if (!p.accepted) return;
