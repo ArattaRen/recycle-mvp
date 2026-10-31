@@ -14,42 +14,121 @@
         .leaflet-popup-content { font-size: 14px; }
         .doc-links { position: absolute; bottom: 6px; left: 8px; z-index: 1000; background: rgba(255,255,255,.88); padding: 3px 9px; border-radius: 4px; font-size: 12px; }
         .doc-links a { color: #228be6; text-decoration: none; }
+
+        #panel { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1000;
+                 background: rgba(255,255,255,0.95); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+                 padding: 8px 10px; max-width: 94%; box-sizing: border-box; }
+        #search { width: 240px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        #chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 72vw; }
+        .chip { font-size: 12px; padding: 4px 8px; border: 1px solid #bbb; border-radius: 14px;
+                background: #fff; cursor: pointer; user-select: none; }
+        .chip.active { background: #28a745; border-color: #28a745; color: #fff; }
+        #toggle { font-size: 13px; padding: 6px 10px; border: 1px solid #bbb; border-radius: 6px;
+                  background: #fff; cursor: pointer; }
+        #count { font-size: 12px; color: #555; margin-top: 6px; }
+        .hidden { display: none; }
+        @media (max-width: 640px) {
+            #panel { width: 94%; }
+            #search { width: 100%; box-sizing: border-box; }
+            #chips { max-width: none; max-height: 30vh; overflow-y: auto; }
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div class="doc-links">
-        <a href="offer.html">Оферта</a> · <a href="privacy.html">Политика ПДн</a> · <a href="disclaimer.html">Дисклеймер</a>
+        <a href="legal/offer.html">Оферта</a> · <a href="legal/privacy.html">Политика ПДн</a> · <a href="legal/disclaimer.html">Дисклеймер</a>
     </div>
+
+    <div id="panel">
+        <button id="toggle">Фильтры и поиск ▾</button>
+        <div id="controls" class="hidden">
+            <input id="search" type="text" placeholder="Поиск по названию точки…">
+            <div id="chips"></div>
+        </div>
+        <div id="count">Загрузка данных…</div>
+    </div>
+
     <script>
-        // Инициализация карты (центр — Краснодарский край)
-        var map = L.map('map').setView([45.04, 38.98], 7);
-        
+        // Инициализация карты (центр — Краснодарский край), кнопки зума унесены
+        // в нижний правый угол, чтобы не пересекаться с документами и панелью
+        var map = L.map('map', { zoomControl: false }).setView([45.04, 38.98], 7);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
         // Подложка Esri (работает без API-ключа)
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Тайлы © Esri | Точки: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (ODbL)'
         }).addTo(map);
 
-        // Запрос к данным (файл points.json лежит рядом с картой)
-        fetch('points.json')
-            .then(response => response.json())
-            .then(data => {
-                var markers = L.markerClusterGroup();
-                data.forEach(p => {
+        var allPoints = [];
+        var activeTypes = new Set();
+        var markers = L.markerClusterGroup();
+        map.addLayer(markers);
+
+        function popupHtml(p) {
+            var accepted = p.accepted || 'уточняйте на месте';
+            // Номера не публикуем (решение владельца, 152-ФЗ): только отметка «есть телефон»
+            var phone = p.has_phone ? '<br>📞 есть телефон' : '';
+            return `<b>${p.name}</b><br>Принимают: ${accepted}${phone}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}`;
+        }
+
+        function applyFilters() {
+            var q = document.getElementById('search').value.trim().toLowerCase();
+            markers.clearLayers();
+            var shown = 0;
+            allPoints.forEach(function(p) {
+                var okType = activeTypes.size === 0 ||
+                    (p.accepted && p.accepted.split(', ').some(function(t) { return activeTypes.has(t); }));
+                var okName = !q || (p.name || '').toLowerCase().indexOf(q) !== -1;
+                if (okType && okName) {
                     var color = p.status === 'GREEN' ? '#28a745' : (p.status === 'YELLOW' ? '#ffc107' : '#6c757d');
                     var m = L.circleMarker([p.lat, p.lon], {
-                        radius: 10,
-                        fillColor: color,
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }).bindPopup(`<b>${p.name}</b><br>Принимают: ${p.accepted || 'уточняйте на месте'}${p.phone ? '<br>📞 <a href="tel:' + p.phone + '">' + p.phone + '</a>' : ''}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}`);
+                        radius: 10, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8
+                    }).bindPopup(popupHtml(p));
                     markers.addLayer(m);
+                    shown++;
+                }
+            });
+            document.getElementById('count').textContent = 'Показано: ' + shown + ' из ' + allPoints.length;
+        }
+
+        // Запрос к данным (файл points.json лежит рядом с картой)
+        fetch('points.json')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                allPoints = data || [];
+                var typeCounts = {};
+                allPoints.forEach(function(p) {
+                    if (!p.accepted) return;
+                    p.accepted.split(', ').forEach(function(t) {
+                        typeCounts[t] = (typeCounts[t] || 0) + 1;
+                    });
                 });
-                map.addLayer(markers);
+                var chips = document.getElementById('chips');
+                Object.keys(typeCounts).sort(function(a, b) { return typeCounts[b] - typeCounts[a]; }).forEach(function(t) {
+                    var c = document.createElement('span');
+                    c.className = 'chip';
+                    c.textContent = t + ' (' + typeCounts[t] + ')';
+                    c.onclick = function() {
+                        if (activeTypes.has(t)) { activeTypes.delete(t); c.classList.remove('active'); }
+                        else { activeTypes.add(t); c.classList.add('active'); }
+                        applyFilters();
+                    };
+                    chips.appendChild(c);
+                });
+                document.getElementById('search').addEventListener('input', applyFilters);
+                applyFilters();
             })
-            .catch(err => console.error("Ошибка API:", err));
+            .catch(function(err) { console.error("Ошибка API:", err); });
+
+        var controlsVisible = window.innerWidth > 640;
+        document.getElementById('controls').classList.toggle('hidden', !controlsVisible);
+        document.getElementById('toggle').textContent = controlsVisible ? 'Скрыть фильтры ▴' : 'Фильтры и поиск ▾';
+        document.getElementById('toggle').onclick = function() {
+            controlsVisible = !controlsVisible;
+            document.getElementById('controls').classList.toggle('hidden', !controlsVisible);
+            this.textContent = controlsVisible ? 'Скрыть фильтры ▴' : 'Фильтры и поиск ▾';
+        };
     </script>
 </body>
 </html>
