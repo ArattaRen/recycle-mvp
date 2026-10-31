@@ -12,17 +12,22 @@
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; }
         .leaflet-popup-content { font-size: 14px; }
+        .doc-links { position: absolute; bottom: 6px; left: 8px; z-index: 1000; background: rgba(255,255,255,.88); padding: 3px 9px; border-radius: 4px; font-size: 12px; }
+        .doc-links a { color: #228be6; text-decoration: none; }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="doc-links">
+        <a href="offer.html">Оферта</a> · <a href="privacy.html">Политика ПДн</a> · <a href="disclaimer.html">Дисклеймер</a>
+    </div>
     <script>
         // Инициализация карты (центр — Краснодарский край)
         var map = L.map('map').setView([45.04, 38.98], 7);
         
         // Подложка Esri (работает без API-ключа)
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Esri'
+            attribution: 'Тайлы © Esri | Точки: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (ODbL)'
         }).addTo(map);
 
         // Запрос к данным (файл points.json лежит рядом с картой)
@@ -39,7 +44,7 @@
                         weight: 2,
                         opacity: 1,
                         fillOpacity: 0.8
-                    }).bindPopup(`<b>${p.name}</b><br>SKU: ${p.sku}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}`);
+                    }).bindPopup(`<b>${p.name}</b><br>Принимают: ${p.accepted || 'уточняйте на месте'}${p.phone ? '<br>📞 <a href="tel:' + p.phone + '">' + p.phone + '</a>' : ''}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}`);
                     markers.addLayer(m);
                 });
                 map.addLayer(markers);

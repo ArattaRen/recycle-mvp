@@ -22,6 +22,50 @@ HEADERS = {
     "Accept": "application/json",
 }
 
+# Т1: мягкий фильтр — убираем объекты, которые точно не являются пунктами
+# приёма вторсырья, но попали в OSM с тегом amenity=recycling
+JUNK_NAME_PARTS = [
+    "свалка", "слив", "ферма", "полигон", "навоз", "гной",
+    "мусоросжиг", "мусороперегруз", "отстойник", "стихийн",
+]
+
+# Т2: словарь «тег OSM → что принимают» для карточки точки
+ACCEPTED_MAP = {
+    "recycling:glass": "стекло",
+    "recycling:glass_bottles": "стеклобой",
+    "recycling:paper": "макулатура",
+    "recycling:cardboard": "картон",
+    "recycling:plastic": "пластик",
+    "recycling:plastic_bottles": "ПЭТ-бутылки",
+    "recycling:pet": "ПЭТ",
+    "recycling:metal": "металл",
+    "recycling:scrap_metal": "металлолом",
+    "recycling:aluminium": "алюминий",
+    "recycling:steel": "жесть",
+    "recycling:cans": "банки",
+    "recycling:clothes": "одежда",
+    "recycling:batteries": "батарейки",
+    "recycling:e_waste": "электроника",
+    "recycling:green_waste": "органика",
+}
+
+
+def extract_accepted(tags):
+    parts = []
+    for key, value in tags.items():
+        if not key.startswith("recycling:"):
+            continue
+        if str(value).lower() not in ("yes", "only"):
+            continue
+        label = ACCEPTED_MAP.get(key, key.replace("recycling:", "").replace("_", " "))
+        if label not in parts:
+            parts.append(label)
+    return ", ".join(parts) if parts else None
+
+
+def extract_phone(tags):
+    return tags.get("phone") or tags.get("contact:phone") or tags.get("contact:mobile")
+
 def fetch_and_save():
     print("Подключение к OpenStreetMap (Overpass API)...")
     # Краснодарский край целиком: bbox (юг, запад, север, восток).
@@ -57,8 +101,17 @@ def fetch_and_save():
     c = conn.cursor()
     
     c.execute("""CREATE TABLE IF NOT EXISTS points (
-        id INTEGER PRIMARY KEY, name TEXT, lat REAL, lon REAL, 
-        sku_code TEXT, price REAL, last_updated TEXT, status TEXT)""")
+        id INTEGER PRIMARY KEY, name TEXT, lat REAL, lon REAL,
+        sku_code TEXT, price REAL, last_updated TEXT, status TEXT,
+        accepted TEXT, phone TEXT)""")
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN accepted TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE points ADD COLUMN phone TEXT")
+    except sqlite3.OperationalError:
+        pass
     c.execute("DELETE FROM points")
     
     count = 0
@@ -68,14 +121,19 @@ def fetch_and_save():
         if lat is None or lon is None:
             continue
             
-        name = el.get('tags', {}).get('name', f"Пункт приема (OSM ID: {el['id']})")
+        tags = el.get('tags', {})
+        name = tags.get('name', f"Пункт приема (OSM ID: {el['id']})")
+        if any(part in name.lower() for part in JUNK_NAME_PARTS):
+            continue
+        accepted = extract_accepted(tags)
+        phone = extract_phone(tags)
         price = round(random.uniform(25.0, 55.0), 2)
         days_ago = random.randint(0, 10)
         status = "GREEN" if days_ago <= 3 else ("YELLOW" if days_ago <= 7 else "GREY")
         last_updated = (date.today() - timedelta(days=days_ago)).isoformat()
         
-        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (name, lat, lon, "PET-MIX", price, last_updated, status))
+        c.execute("INSERT INTO points (name, lat, lon, sku_code, price, last_updated, status, accepted, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone))
         count += 1
         
     conn.commit()

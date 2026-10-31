@@ -78,9 +78,9 @@ def get_points():
 
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT name, lat, lon, sku_code, price, status FROM points")
+    c.execute("SELECT name, lat, lon, sku_code, price, status, accepted, phone FROM points")
     points = [
-        {"name": r[0], "lat": r[1], "lon": r[2], "sku": r[3], "price": r[4], "status": r[5]}
+        {"name": r[0], "lat": r[1], "lon": r[2], "sku": r[3], "price": r[4], "status": r[5], "accepted": r[6], "phone": r[7]}
         for r in c.fetchall()
     ]
     conn.close()
