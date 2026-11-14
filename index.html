@@ -56,7 +56,7 @@
             <div id="chips"></div>
         </div>
         <div id="count">Загрузка данных…</div>
-        <div id="legend"><span class="dot green"></span>свежая &nbsp; <span class="dot yellow"></span>устаревает &nbsp; <span class="dot grey"></span>давно не подтверждена</div>
+        <div id="legend"><span class="dot green"></span>свежая &nbsp; <span class="dot yellow"></span>устаревает &nbsp; <span class="dot grey"></span>давно не подтверждена &nbsp; <b style="color:#888">Цены и статусы — демо-значения (не реальные)</b></div>
         <div id="stamp"></div>
     </div>
 
@@ -83,7 +83,7 @@
             var sku = p.sku_codes ? '<br><small>SKU: ' + p.sku_codes + '</small>' : '';
             var hours = p.opening_hours ? '<br>🕒 ' + p.opening_hours : '';
             var site = p.website ? '<br>🔗 <a href="' + p.website + '" target="_blank" rel="noopener">сайт точки</a>' : '';
-            return `<b>${p.name}</b><br>Принимают: ${accepted}${phone}<br>Цена: ${p.price} ₽/кг<br>Статус: ${p.status}${sku}${hours}${site}`;
+            return `<b>${p.name}</b><br>Принимают: ${accepted}${phone}<br>Цена: ${p.price} ₽/кг <span style="color:#888">(демо)</span><br>Статус: ${p.status} <span style="color:#888">(демо)</span>${sku}${hours}${site}`;
         }
 
         function applyFilters() {
@@ -109,6 +109,9 @@
         }
 
         // Запрос к данным (файл points.json лежит рядом с картой)
+        // Аудит 2026-11-14: если сервер вернул деградированный набор (< MIN_POINTS),
+        // показываем последнюю сохранённую копию из localStorage вместо пустой карты
+        var MIN_POINTS = 100;
         fetch('points.json')
             .then(function(r) {
                 var lm = r.headers.get('last-modified');
@@ -118,7 +121,19 @@
                 return r.json();
             })
             .then(function(data) {
-                allPoints = data || [];
+                if (data && data.length >= MIN_POINTS) {
+                    try { localStorage.setItem('rr_points_cache', JSON.stringify({ ts: Date.now(), data: data })); } catch (e) {}
+                }
+                var cached = null;
+                try { cached = JSON.parse(localStorage.getItem('rr_points_cache') || 'null'); } catch (e) {}
+                if (data && data.length >= MIN_POINTS) {
+                    allPoints = data;
+                } else if (cached && cached.data && cached.data.length >= MIN_POINTS) {
+                    allPoints = cached.data;
+                    document.getElementById('stamp').textContent = '⚠ Свежий ответ сервера неполный — показана сохранённая копия от ' + new Date(cached.ts).toLocaleDateString('ru-RU');
+                } else {
+                    allPoints = data || [];
+                }
                 var cityCounts = {};
                 allPoints.forEach(function(p) {
                     var city = p.city || 'Пригороды и районы';

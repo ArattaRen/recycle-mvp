@@ -240,6 +240,10 @@ ACTIVE_REGION = "Краснодарский край"
 CITY_RADIUS_KM = 30
 CITY_FALLBACK = "Пригороды и районы"
 
+# Аудит 2026-11-14 (краш-тест Е2): отсечение деградированных ответов Overpass.
+# Если зеркала вернули аномально мало точек — откат транзакции, старая БД сохраняется.
+MIN_POINTS_FLOOR = 100
+
 
 def detect_city(lat, lon):
     cities = REGIONS[ACTIVE_REGION]["cities"]
@@ -356,6 +360,13 @@ def fetch_and_save():
                   (name, lat, lon, "PET-MIX", price, last_updated, status, accepted, phone, detect_city(lat, lon), osm_key, sku_codes, opening_hours, website))
         count += 1
         
+    if count < MIN_POINTS_FLOOR:
+        conn.rollback()
+        conn.close()
+        print(f"Отсечение: получено {count} точек < порога {MIN_POINTS_FLOOR}. "
+              f"Ответ Overpass деградирован — откат транзакции, старая база сохранена.")
+        return False
+
     conn.commit()
     conn.close()
     print(f"Успех! В базу загружено {count} реальных точек.")
