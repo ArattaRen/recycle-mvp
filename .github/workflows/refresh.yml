@@ -25,6 +25,9 @@ jobs:
         run: pip install requests
 
       - name: Запустить парсер (Overpass API, до 3 попыток)
+        env:
+          # Список скрытых точек — секрет репозитория (не публикуется в открытом коде, Ж1 2026-11-15)
+          HIDDEN_POINTS: ${{ secrets.HIDDEN_POINTS }}
         run: |
           ok=0
           for i in 1 2 3; do
