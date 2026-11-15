@@ -46,15 +46,26 @@ def validate_overpass_url(url):
     return True
 
 
-# Скрытые точки: идентификаторы из hidden_points.txt не попадают на карту
-# (юритребование оферты «Скрыть мою точку»). Формат файла: по одному в строке
-# "node/<id>" или "way/<id>", строки с # — комментарии. Пустой файл/отсутствие = нечего скрывать.
+# Скрытые точки: идентификаторы скрытых точек не попадают на карту
+# (юритребование оферты «Скрыть мою точку»). Источник списка — по порядку:
+# 1) переменная окружения HIDDEN_POINTS (в GitHub Actions — секрет репозитория;
+#    список скрытий не публикуется в открытом репозитории — решение Ж1, 2026-11-15);
+# 2) локальный файл hidden_points.txt (для запусков на своей машине; в публичный
+#    репозиторий файл больше не выкладывается).
+# Формат: по одному в строке "node/<id>" или "way/<id>", строки с # — комментарии.
 HIDDEN_FILE = "hidden_points.txt"
 
 
 def load_hidden_ids():
-    path = os.path.join(BASE_DIR, HIDDEN_FILE)
     hidden = set()
+    env_value = os.environ.get("HIDDEN_POINTS", "")
+    if env_value.strip():
+        for line in env_value.splitlines():
+            key = line.strip().lower()
+            if key and not key.startswith("#"):
+                hidden.add(key)
+        return hidden
+    path = os.path.join(BASE_DIR, HIDDEN_FILE)
     if not os.path.exists(path):
         return hidden
     with open(path, "r", encoding="utf-8") as f:
@@ -333,6 +344,8 @@ def fetch_and_save():
     c.execute("DELETE FROM points")
     
     hidden = load_hidden_ids()
+    hidden_source = "env HIDDEN_POINTS" if os.environ.get("HIDDEN_POINTS", "").strip() else HIDDEN_FILE
+    print(f"Скрытые точки: {len(hidden)} ID (источник: {hidden_source})")
     count = 0
     for el in data.get('elements', []):
         osm_key = f"{el.get('type', 'node')}/{el['id']}".lower()
