@@ -39,7 +39,9 @@ jobs:
           if [ "$ok" != "1" ]; then echo "Все попытки провалились"; exit 1; fi
 
       - name: Выгрузить точки в points.json
-        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, sku_code AS sku, price, status, accepted, (phone IS NOT NULL AND phone != '') AS has_phone, city, sku_codes, opening_hours, website FROM points" > points.json
+        # Е-фикс 2026-11-15: мёртвое поле sku (константа PET-MIX) убрано из выгрузки —
+        # карта строит карточку из sku_codes (index.html); правило 9: парсер→export→карта
+        run: sqlite3 -json recycle_local.db "SELECT name, lat, lon, price, status, accepted, (phone IS NOT NULL AND phone != '') AS has_phone, city, sku_codes, opening_hours, website FROM points" > points.json
 
       - name: Опубликовать обновление
         run: |
