@@ -72,15 +72,18 @@ def health():
 
 @app.get("/api/points")
 def get_points():
+    # Аудит 2026-11-14 (Е1): ПДн-утечка устранена — API возвращает флаг has_phone,
+    # а не сами номера (152-ФЗ; правило 5: телефоны точек не публикуются).
+    # ВНИМАНИЕ: до Т-5 этот сервер поднимать только с привязкой к 127.0.0.1.
     # Если база еще не создана (сервер только включился), вернем пустой список
     if not os.path.exists(DB_NAME):
         return JSONResponse(content=[])
 
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT name, lat, lon, sku_code, price, status, accepted, phone FROM points")
+    c.execute("SELECT name, lat, lon, sku_code, price, status, accepted, (phone IS NOT NULL AND phone != '') FROM points")
     points = [
-        {"name": r[0], "lat": r[1], "lon": r[2], "sku": r[3], "price": r[4], "status": r[5], "accepted": r[6], "phone": r[7]}
+        {"name": r[0], "lat": r[1], "lon": r[2], "sku": r[3], "price": r[4], "status": r[5], "accepted": r[6], "has_phone": 1 if r[7] else 0}
         for r in c.fetchall()
     ]
     conn.close()
