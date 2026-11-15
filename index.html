@@ -76,14 +76,26 @@
         var markers = L.markerClusterGroup();
         map.addLayer(markers);
 
+        // Аудит 2026-11-15 (Е-фикс): OSM — публично правимый источник, вставка его данных
+        // в HTML попапа без экранирования = XSS-вектор (теги в name, атрибут-инъекция в website)
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        // Ссылку на сайт пускаем только с http(s)-префиксом — иначе атрибут не строится вовсе
+        function safeUrl(u) {
+            var s = String(u || '').trim();
+            return /^https?:\/\//i.test(s) ? esc(s) : '';
+        }
         function popupHtml(p) {
-            var accepted = p.accepted || 'уточняйте на месте';
+            var accepted = p.accepted ? esc(p.accepted) : 'уточняйте на месте';
             // Номера не публикуем (решение владельца, 152-ФЗ): только отметка «есть телефон»
             var phone = p.has_phone ? '<br>📞 есть телефон' : '';
-            var sku = p.sku_codes ? '<br><small>SKU: ' + p.sku_codes + '</small>' : '';
-            var hours = p.opening_hours ? '<br>🕒 ' + p.opening_hours : '';
-            var site = p.website ? '<br>🔗 <a href="' + p.website + '" target="_blank" rel="noopener">сайт точки</a>' : '';
-            return `<b>${p.name}</b><br>Принимают: ${accepted}${phone}<br>Цена: ${p.price} ₽/кг <span style="color:#888">(демо)</span><br>Статус: ${p.status} <span style="color:#888">(демо)</span>${sku}${hours}${site}`;
+            var sku = p.sku_codes ? '<br><small>SKU: ' + esc(p.sku_codes) + '</small>' : '';
+            var hours = p.opening_hours ? '<br>🕒 ' + esc(p.opening_hours) : '';
+            var site = safeUrl(p.website) ? '<br>🔗 <a href="' + safeUrl(p.website) + '" target="_blank" rel="noopener noreferrer">сайт точки</a>' : '';
+            return `<b>${esc(p.name)}</b><br>Принимают: ${accepted}${phone}<br>Цена: ${esc(p.price)} ₽/кг <span style="color:#888">(демо)</span><br>Статус: ${esc(p.status)} <span style="color:#888">(демо)</span>${sku}${hours}${site}`;
         }
 
         function applyFilters() {
