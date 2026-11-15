@@ -81,9 +81,10 @@ def get_points():
 
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT name, lat, lon, sku_code, price, status, accepted, (phone IS NOT NULL AND phone != '') FROM points")
+    # Аудит 2026-11-15 (Е-фикс): мёртвое поле sku убрано из выдачи — канон полей = points.json
+    c.execute("SELECT name, lat, lon, price, status, accepted, (phone IS NOT NULL AND phone != '') FROM points")
     points = [
-        {"name": r[0], "lat": r[1], "lon": r[2], "sku": r[3], "price": r[4], "status": r[5], "accepted": r[6], "has_phone": 1 if r[7] else 0}
+        {"name": r[0], "lat": r[1], "lon": r[2], "price": r[3], "status": r[4], "accepted": r[5], "has_phone": 1 if r[6] else 0}
         for r in c.fetchall()
     ]
     conn.close()
